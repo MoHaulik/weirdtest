@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WebXR Video Portal Menu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 50%, #dde2e6 100%);
+      overflow: hidden;
+      height: 100vh;
+      position: relative;
+      color: #333;
+    }
+    
+    #menu-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    
+    .start-button {
+      width: 160px;
+      height: 160px;
+      border: 3px solid rgba(255,255,255,0.9);
+      border-radius: 25px;
+      background: rgba(255,255,255,0.8);
+      backdrop-filter: blur(20px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      flex-direction: column;
+      color: #333;
+      font-size: 16px;
+      font-weight: 600;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    }
+    
+    .start-button:hover {
+      transform: scale(1.05);
+      background: rgba(255,255,255,0.95);
+      box-shadow: 0 12px 48px rgba(0,0,0,0.15);
+    }
+    
+    .start-button::before {
+      content: 'VR';
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #007AFF;
+    }
+    
+    .exit-button {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      color: #333;
+      font-size: 24px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .exit-button:hover {
+      background: rgba(255,255,255,1);
+      transform: scale(1.05);
+    }
+    
+    .immersive-mode .exit-button {
+      display: flex;
+    }
+    
+    .status {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.95);
+      color: #333;
+      padding: 12px 24px;
+      border-radius: 16px;
+      font-size: 14px;
+      z-index: 1001;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .status.visible {
+      opacity: 1;
+    }
+    
+    .device-info {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(255,255,255,0.9);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 12px;
+      color: #333;
+      padding: 8px 12px;
+      font-size: 12px;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .device-info.visible {
+      opacity: 1;
+    }
+    
+    .subtitle {
+      margin-top: 24px;
+      font-size: 18px;
+      color: #666;
+      text-align: center;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div id="menu-container">
+    <div class="start-button" id="start-button">
+      <div>Video Menu</div>
+    </div>
+    <div class="subtitle">Enter WebXR to browse 12 immersive videos</div>
+  </div>
+  
+  <button class="exit-button" id="exit-button">×</button>
+  <div class="device-info" id="device-info"></div>
+  <div class="status" id="status"></div>
+  
+  <video id="video" style="display: none;" playsinline crossorigin="anonymous"></video>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.150.1/build/three.module.js';
+
+    // Video data with 12 videos
+    const videoData = [
+      { title: 'Ocean Depths', file: 'video1.mp4', thumb: '1.png', description: '360° underwater adventure' },
+      { title: 'Mountain Peak', file: 'video2.mp4', thumb: '2.png', description: 'Alpine summit experience' },
+      { title: 'City Lights', file: 'video3.mp4', thumb: '3.png', description: 'Urban night journey' },
+      { title: 'Forest Walk', file: 'video4.mp4', thumb: '4.png', description: 'Peaceful woodland path' },
+      { title: 'Desert Sunrise', file: 'video5.mp4', thumb: '5.png', description: 'Dawn in the dunes' },
+      { title: 'Space Station', file: 'video6.mp4', thumb: '6.png', description: 'Orbital laboratory tour' },
+      { title: 'Coral Reef', file: 'video7.mp4', thumb: '7.png', description: 'Tropical marine life' },
+      { title: 'Northern Lights', file: 'video8.mp4', thumb: '8.png', description: 'Aurora borealis dance' },
+      { title: 'Volcano Rim', file: 'video9.mp4', thumb: '9.png', description: 'Edge of active crater' },
+      { title: 'Cloud Forest', file: 'video10.mp4', thumb: '10.png', description: 'Misty canopy journey' },
+      { title: 'Ice Cave', file: 'video11.mp4', thumb: '11.png', description: 'Frozen crystal cavern' },
+      { title: 'Savanna Storm', file: 'video12.mp4', thumb: '12.png', description: 'Lightning over plains' }
+    ];
+
+    // Core variables
+    let camera, scene, renderer, controllers = [], xrSession = null;
+    let menuPanels = [], hoveredPanel = -1, selectedVideo = null;
+    let isInImmersiveMode = false, isInPortalMode = false, isInFullImmersiveMode = false;
+    let arSupported = false, raycaster = new THREE.Raycaster(), tempMatrix = new THREE.Matrix4();
+    let clock = new THREE.Clock();
+    
+    // Video player components
+    let videoElement, videoTexture, videoMaterial, portalGroup, immersiveSphere, portalMesh, frameMesh;
+    let isPlaying = false, currentVolume = 1.0;
+    
+    // Grid configuration
+    const gridCols = 4, gridRows = 3, curveRadius = 3.2;
+    
+    // Controller state
+    let controllerState = [
+      { isPressed: false, pressStartTime: 0, longPressTriggered: false },
+      { isPressed: false, pressStartTime: 0, longPressTriggered: false }
+    ];
+    
+    // DOM elements
+    const startButton = document.getElementById('start-button');
+    const exitButton = document.getElementById('exit-button');
+    const statusEl = document.getElementById('status');
+    const deviceInfoEl = document.getElementById('device-info');
+    
+    // Create text texture helper
+    function createTextTexture(text, fontSize = 48, color = '#333333', bgColor = 'transparent') {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      canvas.width = 512;
+      canvas.height = 128;
+      
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.fillStyle = color;
+      ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = '';
+      
+      for (let word of words) {
+        const testLine = currentLine + word + ' ';
+        if (ctx.measureText(testLine).width > canvas.width - 40 && currentLine !== '') {
+          lines.push(currentLine.trim());
+          currentLine = word + ' ';
+        } else {
+          currentLine = testLine;
+        }
+      }
+      lines.push(currentLine.trim());
+      
+      const lineHeight = fontSize * 1.2;
+      const startY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
+      
+      lines.forEach((line, i) => {
+        ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
+      });
+      
+      return new THREE.CanvasTexture(canvas);
+    }
+    
+    function init() {
+      checkARSupport();
+      
+      // Setup Three.js
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+      
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      renderer.setClearColor(0x000000, 0);
+      renderer.domElement.style.position = 'absolute';
+      renderer.domElement.style.top = '0';
+      renderer.domElement.style.left = '0';
+      renderer.domElement.style.zIndex = '-1';
+      document.body.appendChild(renderer.domElement);
+      
+      // Setup video element
+      videoElement = document.getElementById('video');
+      videoTexture = new THREE.VideoTexture(videoElement);
+      videoTexture.minFilter = THREE.LinearFilter;
+      videoTexture.magFilter = THREE.LinearFilter;
+      videoMaterial = new THREE.MeshBasicMaterial({ map: videoTexture });
+      
+      // Setup menu panels
+      setupMenuPanels();
+      
+      // Add lighting
+      const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(1, 1, 0.5);
+      scene.add(directionalLight);
+      
+      // Event listeners
+      startButton.addEventListener('click', enterVRMenu);
+      exitButton.addEventListener('click', exitImmersiveMode);
+      window.addEventListener('resize', onWindowResize);
+    }
+    
+    async function checkARSupport() {
+      if (!navigator.xr) {
+        updateDeviceInfo('Standard Device');
+        return;
+      }
+      
+      try {
+        arSupported = await navigator.xr.isSessionSupported('immersive-ar');
+        updateDeviceInfo(arSupported ? 'WebXR Ready' : 'WebXR Not Available');
+      } catch (e) {
+        updateDeviceInfo('WebXR Check Failed');
+      }
+    }
+    
+    function updateDeviceInfo(text) {
+      deviceInfoEl.textContent = text;
+      deviceInfoEl.classList.add('visible');
+      setTimeout(() => deviceInfoEl.classList.remove('visible'), 4000);
+    }
+    
+    function setupMenuPanels() {
+      menuPanels = [];
+      
+      // Create geometries with rounded corners effect
+      const panelGeometry = new THREE.PlaneGeometry(0.45, 0.35);
+      const frameGeometry = new THREE.PlaneGeometry(0.47, 0.37);
+      const titleGeometry = new THREE.PlaneGeometry(0.45, 0.08);
+      
+      for (let i = 0; i < videoData.length; i++) {
+        const row = Math.floor(i / gridCols);
+        const col = i % gridCols;
+        
+        // Calculate position with improved spacing
+        const x = (col - (gridCols - 1) / 2) * 0.6;
+        const y = ((gridRows - 1) / 2 - row) * 0.5;
+        const z = -2.8;
+        
+        // Apply curve
+        const angle = (x / (gridCols * 0.35)) * 0.7;
+        const curvedX = Math.sin(angle) * curveRadius;
+        const curvedZ = z + Math.cos(angle) * curveRadius - curveRadius;
+        
+        // Create panel group
+        const panelGroup = new THREE.Group();
+        panelGroup.position.set(curvedX, y, curvedZ);
+        panelGroup.lookAt(0, y, 0);
+        
+        // Create frame (light, rounded appearance)
+        const frameMaterial = new THREE.MeshLambertMaterial({ 
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.9
+        });
+        const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+        frame.position.z = -0.001;
+        panelGroup.add(frame);
+        
+        // Create thumbnail panel (light background)
+        const thumbnailMaterial = new THREE.MeshLambertMaterial({ 
+          color: 0xf5f5f5,
+          transparent: true 
+        });
+        const panel = new THREE.Mesh(panelGeometry, thumbnailMaterial);
+        panelGroup.add(panel);
+        
+        // Create title with dark text
+        const titleTexture = createTextTexture(videoData[i].title, 36, '#333333', 'transparent');
+        const titleMaterial = new THREE.MeshLambertMaterial({ 
+          map: titleTexture,
+          transparent: true,
+          opacity: 0.9
+        });
+        const title = new THREE.Mesh(titleGeometry, titleMaterial);
+        title.position.set(0, -0.24, 0.001);
+        panelGroup.add(title);
+        
+        // Load thumbnail
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.load(
+          videoData[i].thumb,
+          (texture) => {
+            thumbnailMaterial.map = texture;
+            thumbnailMaterial.color.setHex(0xffffff);
+            thumbnailMaterial.needsUpdate = true;
+          },
+          undefined,
+          (error) => {
+            console.log('Thumbnail load failed for', videoData[i].thumb);
+          }
+        );
+        
+        // Store panel data
+        panelGroup.userData = {
+          index: i,
+          originalScale: new THREE.Vector3(1, 1, 1),
+          originalPosition: new THREE.Vector3(curvedX, y, curvedZ),
+          targetScale: new THREE.Vector3(1, 1, 1),
+          targetPosition: new THREE.Vector3(curvedX, y, curvedZ),
+          frame: frame,
+          panel: panel,
+          title: title,
+          video: videoData[i],
+          isHovered: false
+        };
+        
+        menuPanels.push(panelGroup);
+        scene.add(panelGroup);
+      }
+    }
+    
+    function createPortal() {
+      if (portalGroup) scene.remove(portalGroup);
+      
+      portalGroup = new THREE.Group();
+      
+      // Create portal frame (light, modern style)
+      const frameGeometry = new THREE.RingGeometry(0.95, 1.05, 32);
+      const frameMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.9
+      });
+      frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
+      portalGroup.add(frameMesh);
+      
+      // Create inner video sphere for 360° content
+      const videoSphere = new THREE.SphereGeometry(0.9, 32, 16);
+      portalMesh = new THREE.Mesh(videoSphere, videoMaterial);
+      portalMesh.material.side = THREE.BackSide;
+      portalMesh.rotation.y = THREE.MathUtils.degToRad(80);
+      portalGroup.add(portalMesh);
+      
+      // Position portal
+      portalGroup.position.set(0, 1.6, -2);
+      scene.add(portalGroup);
+      
+      // Add subtle glow (light blue/white)
+      const glowGeometry = new THREE.RingGeometry(1.05, 1.1, 32);
+      const glowMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x007AFF,
+        transparent: true,
+        opacity: 0.2
+      });
+      const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+      portalGroup.add(glowMesh);
+    }
+    
+    function createImmersiveSphere() {
+      if (immersiveSphere) scene.remove(immersiveSphere);
+      
+      const sphereGeometry = new THREE.SphereGeometry(10, 32, 16);
+      immersiveSphere = new THREE.Mesh(sphereGeometry, videoMaterial);
+      immersiveSphere.material.side = THREE.BackSide;
+      immersiveSphere.rotation.y = THREE.MathUtils.degToRad(80);
+      scene.add(immersiveSphere);
+    }
+    
+    function loadVideo(videoIndex) {
+      const video = videoData[videoIndex];
+      selectedVideo = video;
+      
+      if (videoElement.src) {
+        videoElement.pause();
+        videoElement.currentTime = 0;
+        URL.revokeObjectURL(videoElement.src);
+      }
+      
+      videoElement.src = video.file;
+      videoElement.autoplay = true;
+      videoElement.playsInline = true;
+      videoElement.volume = currentVolume;
+      videoElement.muted = false;
+      videoElement.loop = true;
+      
+      videoElement.removeEventListener('loadeddata', onVideoLoaded);
+      videoElement.addEventListener('loadeddata', onVideoLoaded);
+      
+      videoElement.load();
+      
+      videoElement.play().catch(err => {
+        showStatus('Playback failed: trying muted');
+        videoElement.muted = true;
+        videoElement.play().catch(e => {
+          showStatus('Video load failed: ' + e.message);
+        });
+      });
+    }
+    
+    function onVideoLoaded() {
+      showStatus(`Portal video loaded: ${selectedVideo.title}`);
+      createPortal();
+      if (videoTexture) {
+        videoTexture.needsUpdate = true;
+      }
+      
+      // Hide menu panels and show portal
+      menuPanels.forEach(panel => panel.visible = false);
+      isInPortalMode = true;
+    }
+    
+    function toggleImmersiveMode() {
+      isInFullImmersiveMode = !isInFullImmersiveMode;
+      
+      if (isInFullImmersiveMode) {
+        if (portalGroup) portalGroup.visible = false;
+        createImmersiveSphere();
+        showStatus('Immersive 360° mode - Long press to return to portal');
+      } else {
+        if (immersiveSphere) immersiveSphere.visible = false;
+        if (portalGroup) portalGroup.visible = true;
+        showStatus('Portal mode - Long press for immersive 360°');
+      }
+    }
+    
+    function returnToMenu() {
+      // Stop video
+      if (videoElement) {
+        videoElement.pause();
+        videoElement.currentTime = 0;
+      }
+      
+      // Hide portal and immersive sphere
+      if (portalGroup) {
+        scene.remove(portalGroup);
+        portalGroup = null;
+      }
+      if (immersiveSphere) {
+        scene.remove(immersiveSphere);
+        immersiveSphere = null;
+      }
+      
+      // Show menu panels
+      menuPanels.forEach(panel => panel.visible = true);
+      
+      // Reset states
+      isInPortalMode = false;
+      isInFullImmersiveMode = false;
+      isPlaying = false;
+      hoveredPanel = -1;
+      
+      showStatus('Back to video menu - Select another video');
+    }
+    
+    async function enterVRMenu() {
+      if (!arSupported) {
+        showStatus('WebXR not supported - check your device');
+        return;
+      }
+      
+      try {
+        const session = await navigator.xr.requestSession('immersive-ar', {
+          optionalFeatures: ['hand-tracking', 'local-floor']
+        });
+        
+        await onSessionStarted(session);
+        
+      } catch (err) {
+        showStatus('AR failed: ' + err.message);
+      }
+    }
+    
+    async function onSessionStarted(session) {
+      xrSession = session;
+      isInImmersiveMode = true;
+      
+      document.body.classList.add('immersive-mode');
+      
+      renderer.xr.setReferenceSpaceType('local-floor');
+      await renderer.xr.setSession(session);
+      
+      // Setup controllers
+      controllers = [0, 1].map(i => {
+        const controller = renderer.xr.getController(i);
+        controller.addEventListener('selectstart', () => handleControllerPress(i, true));
+        controller.addEventListener('selectend', () => handleControllerPress(i, false));
+        scene.add(controller);
+        return controller;
+      });
+      
+      renderer.setAnimationLoop(render);
+      session.addEventListener('end', onSessionEnd);
+      
+      showStatus('VR Menu Active - Point and tap to select video');
+    }
+    
+    function handleControllerPress(controllerIndex, isPressed) {
+      const state = controllerState[controllerIndex];
+      
+      if (isPressed) {
+        state.isPressed = true;
+        state.pressStartTime = Date.now();
+        state.longPressTriggered = false;
+        
+        // Long press handler
+        setTimeout(() => {
+          if (state.isPressed && !state.longPressTriggered) {
+            const pressDuration = Date.now() - state.pressStartTime;
+            if (pressDuration >= 1500) {
+              state.longPressTriggered = true;
+              
+              if (isInPortalMode) {
+                if (isInFullImmersiveMode) {
+                  toggleImmersiveMode(); // Return to portal
+                } else {
+                  returnToMenu(); // Return to menu
+                }
+              } else {
+                exitImmersiveMode(); // Exit VR
+              }
+            }
+          }
+        }, 1500);
+        
+      } else {
+        if (state.isPressed && !state.longPressTriggered) {
+          const pressDuration = Date.now() - state.pressStartTime;
+          
+          if (pressDuration < 500) {
+            if (isInPortalMode) {
+              if (isInFullImmersiveMode) {
+                // Toggle back to portal
+                toggleImmersiveMode();
+              } else {
+                // Enter immersive mode
+                toggleImmersiveMode();
+              }
+            } else {
+              // Select video from menu
+              if (hoveredPanel >= 0) {
+                loadVideo(hoveredPanel);
+              }
+            }
+          }
+        }
+        
+        state.isPressed = false;
+        state.pressStartTime = 0;
+        state.longPressTriggered = false;
+      }
+    }
+    
+    function updatePanelHover() {
+      if (!controllers.length || isInPortalMode) return;
+      
+      let newHoveredPanel = -1;
+      
+      for (let i = 0; i < controllers.length; i++) {
+        const controller = controllers[i];
+        
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+        
+        const intersects = raycaster.intersectObjects(menuPanels, true);
+        
+        if (intersects.length > 0) {
+          const intersectedPanel = intersects[0].object.parent;
+          if (intersectedPanel.userData.index !== undefined) {
+            newHoveredPanel = intersectedPanel.userData.index;
+            break;
+          }
+        }
+      }
+      
+      // Update hover states
+      if (newHoveredPanel !== hoveredPanel) {
+        // Reset previous
+        if (hoveredPanel >= 0) {
+          const prevPanel = menuPanels[hoveredPanel];
+          prevPanel.userData.targetScale.copy(prevPanel.userData.originalScale);
+          prevPanel.userData.targetPosition.copy(prevPanel.userData.originalPosition);
+          prevPanel.userData.isHovered = false;
+        }
+        
+        // Set new
+        hoveredPanel = newHoveredPanel;
+        if (hoveredPanel >= 0) {
+          const panel = menuPanels[hoveredPanel];
+          panel.userData.targetScale.set(1.15, 1.15, 1.15);
+          panel.userData.targetPosition.copy(panel.userData.originalPosition).add(new THREE.Vector3(0, 0, 0.1));
+          panel.userData.isHovered = true;
+        }
+      }
+    }
+    
+    function animatePanels() {
+      const deltaTime = clock.getDelta();
+      const lerpFactor = Math.min(deltaTime * 8, 1);
+      
+      menuPanels.forEach(panel => {
+        const userData = panel.userData;
+        
+        panel.scale.lerp(userData.targetScale, lerpFactor);
+        panel.position.lerp(userData.targetPosition, lerpFactor);
+        
+        if (userData.isHovered) {
+          userData.frame.material.color.lerp(new THREE.Color(0x007AFF), lerpFactor);
+          userData.frame.material.opacity = THREE.MathUtils.lerp(userData.frame.material.opacity, 1.0, lerpFactor);
+        } else {
+          userData.frame.material.color.lerp(new THREE.Color(0xffffff), lerpFactor);
+          userData.frame.material.opacity = THREE.MathUtils.lerp(userData.frame.material.opacity, 0.9, lerpFactor);
+        }
+      });
+    }
+    
+    function animatePortal() {
+      if (!portalGroup || !portalGroup.visible) return;
+      
+      const time = Date.now() * 0.001;
+      
+      // Gentle floating motion
+      portalGroup.position.y = 1.6 + Math.sin(time * 0.5) * 0.08;
+      portalGroup.rotation.y = Math.sin(time * 0.3) * 0.05;
+      
+      // Portal follows user gaze
+      const direction = new THREE.Vector3(0, 0, -1);
+      direction.applyQuaternion(camera.quaternion);
+      direction.multiplyScalar(2);
+      
+      const targetPosition = new THREE.Vector3().copy(camera.position).add(direction);
+      targetPosition.y = portalGroup.position.y;
+      
+      portalGroup.position.x = THREE.MathUtils.lerp(portalGroup.position.x, targetPosition.x, 0.02);
+      portalGroup.position.z = THREE.MathUtils.lerp(portalGroup.position.z, targetPosition.z, 0.02);
+      
+      portalGroup.lookAt(camera.position);
+    }
+    
+    function render() {
+      updatePanelHover();
+      animatePanels();
+      animatePortal();
+      
+      if (videoTexture) videoTexture.needsUpdate = true;
+      renderer.render(scene, camera);
+    }
+    
+    function exitImmersiveMode() {
+      if (xrSession) {
+        xrSession.end();
+      }
+    }
+    
+    function onSessionEnd() {
+      isInImmersiveMode = false;
+      document.body.classList.remove('immersive-mode');
+      
+      renderer.setAnimationLoop(null);
+      xrSession = null;
+      
+      controllers.forEach(controller => scene.remove(controller));
+      controllers = [];
+      
+      controllerState.forEach(state => {
+        state.isPressed = false;
+        state.pressStartTime = 0;
+        state.longPressTriggered = false;
+      });
+      
+      // Reset states
+      hoveredPanel = -1;
+      isInPortalMode = false;
+      isInFullImmersiveMode = false;
+      
+      // Reset panels
+      menuPanels.forEach(panel => {
+        panel.scale.copy(panel.userData.originalScale);
+        panel.position.copy(panel.userData.originalPosition);
+        panel.userData.isHovered = false;
+        panel.visible = true;
+      });
+      
+      // Clean up video components
+      if (portalGroup) {
+        scene.remove(portalGroup);
+        portalGroup = null;
+      }
+      if (immersiveSphere) {
+        scene.remove(immersiveSphere);
+        immersiveSphere = null;
+      }
+      
+      showStatus('Exited VR Menu');
+    }
+    
+    function showStatus(message) {
+      statusEl.textContent = message;
+      statusEl.classList.add('visible');
+      
+      clearTimeout(showStatus.timeout);
+      showStatus.timeout = setTimeout(() => {
+        statusEl.classList.remove('visible');
+      }, 3000);
+    }
+    
+    function onWindowResize() {
+      if (camera) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      }
+      if (renderer) {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    }
+    
+    // Cleanup
+    window.addEventListener('beforeunload', () => {
+      if (xrSession) {
+        xrSession.end();
+      }
+    });
+    
+    // Initialize
+    init();
+  </script>
+</body>
+</html>
